@@ -24,6 +24,7 @@ type Crawler struct {
 	AllPeersMutex sync.Mutex
 	AllPeers      map[[gotox.PublicKeySize]byte]PeerInfo
 	Done          bool
+	DoneCh        chan struct{}
 }
 
 func NewCrawler() (*Crawler, error) {
@@ -40,8 +41,6 @@ func NewCrawler() (*Crawler, error) {
 		AllPeers:  make(map[[gotox.PublicKeySize]byte]PeerInfo),
 	}
 	transport.RegisterReceiver(s.Receive)
-
-	go transport.Listen()
 
 	go s.pingerTask()
 
@@ -86,8 +85,7 @@ func (s *Crawler) pingerTask() {
 			time.Sleep(time.Second)
 		} else {
 			if done {
-				s.Done = true
-				fmt.Println("done.")
+				s.Transport.Stop()
 				return
 			}
 		}
@@ -95,9 +93,6 @@ func (s *Crawler) pingerTask() {
 }
 
 func (s *Crawler) Receive(pp *dht.PlainPacket, addr *net.UDPAddr) bool {
-	if s.Done {
-		return true
-	}
 	switch payload := pp.Payload.(type) {
 	case *dht.GetNodesReply:
 		// There are only 4 replies
@@ -115,7 +110,7 @@ func (s *Crawler) Receive(pp *dht.PlainPacket, addr *net.UDPAddr) bool {
 		}
 		s.AllPeersMutex.Unlock()
 	default:
-		fmt.Printf("Internal error. Failed to handle payload of parsed packet. %d", pp.Payload.Kind())
+		//fmt.Printf("Internal error. Failed to handle payload of parsed packet. %d\n", pp.Payload.Kind())
 	}
 	return false
 }
@@ -127,7 +122,8 @@ func main() {
 		return
 	}
 
-	go crawler.Listen()
+	ch := make(chan struct{})
+	go crawler.Listen(ch)
 
 	for _, server := range dht.DhtServerList[:5] {
 		err := crawler.Send(&dht.GetNodes{
@@ -139,5 +135,6 @@ func main() {
 		}
 	}
 
-	time.Sleep(time.Hour * 1000000)
+	<-ch
+	fmt.Printf("total: %d\n", len(crawler.AllPeers))
 }
