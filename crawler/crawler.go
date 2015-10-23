@@ -1,4 +1,4 @@
-package main
+package crawler
 
 import (
 	"crypto/rand"
@@ -23,11 +23,9 @@ type Crawler struct {
 	// this holds all nodes discovered
 	AllPeersMutex sync.Mutex
 	AllPeers      map[[gotox.PublicKeySize]byte]PeerInfo
-	Done          bool
-	DoneCh        chan struct{}
 }
 
-func NewCrawler() (*Crawler, error) {
+func New() (*Crawler, error) {
 	id, err := dht.GenerateIdentity()
 	if err != nil {
 		return nil, err
@@ -113,28 +111,4 @@ func (s *Crawler) Receive(pp *dht.PlainPacket, addr *net.UDPAddr) bool {
 		//fmt.Printf("Internal error. Failed to handle payload of parsed packet. %d\n", pp.Payload.Kind())
 	}
 	return false
-}
-
-func main() {
-	crawler, err := NewCrawler()
-	if err != nil {
-		fmt.Printf("Failed to create server %s.\n", err)
-		return
-	}
-
-	ch := make(chan struct{})
-	go crawler.Listen(ch)
-
-	for _, server := range dht.DhtServerList[:5] {
-		err := crawler.Send(&dht.GetNodes{
-			RequestedNodeID: &server.PublicKey,
-		}, &server)
-		if err != nil {
-			fmt.Printf("error %s\n", err)
-			return
-		}
-	}
-
-	<-ch
-	fmt.Printf("total: %d\n", len(crawler.AllPeers))
 }
