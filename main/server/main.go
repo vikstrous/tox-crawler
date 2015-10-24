@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"sync"
@@ -12,6 +14,9 @@ import (
 	"github.com/vikstrous/tox-crawler/crawler"
 	"golang.org/x/net/websocket"
 )
+
+const DataFile = "data.json"
+const MaxDatapoints = 14000
 
 type Result struct {
 	Time   time.Time `json:"time"`
@@ -52,21 +57,41 @@ func (c *Crawler) OneCrawl() int {
 	<-ch
 	return len(crawl.AllPeers)
 }
+
 func (c *Crawler) Crawl() {
 	for {
+		log.Printf("Scanning...")
 		numNodes := c.OneCrawl()
+		log.Printf("Found %d nodes", numNodes)
 		c.Mut.Lock()
+		// update graph
 		c.Results = append(c.Results, Result{time.Now(), numNodes})
-		if len(c.Results) > 10000 {
+		if len(c.Results) > MaxDatapoints {
 			c.Results = c.Results[1:]
 		}
+		// save data
+		content, err := json.Marshal(c.Results)
+		if err != nil {
+			log.Printf("Error building json: %s", err)
+		}
+		log.Printf("Saving data...")
+		err = ioutil.WriteFile(DataFile, content, 0644)
+		if err != nil {
+			log.Printf("Error writing data: %s", err)
+		}
+		log.Printf("Saved data...")
 		c.Mut.Unlock()
+		// notify listeners that we added a new entry
 		c.ChMut.Lock()
+		log.Printf("Notifying %d websocket clients", len(c.ChResults))
 		for _, ch := range c.ChResults {
 			close(ch)
 		}
 		c.ChResults = [](chan struct{}){}
 		c.ChMut.Unlock()
+		// slow down our crawling interval to avoid using too much bandwidth
+		log.Printf("Taking a nap until next interval")
+		time.Sleep(5 * time.Minute)
 	}
 }
 
@@ -116,13 +141,23 @@ func (c *Crawler) statsHandler(ws *websocket.Conn) {
 }
 
 func main() {
-
 	c := NewCrawler()
+	content, err := ioutil.ReadFile(DataFile)
+	if err != nil {
+		c.Results = make([]Result, 0, MaxDatapoints)
+	} else {
+		err = json.Unmarshal(content, &c.Results)
+		if err != nil {
+			panic("Failed to load data: " + err.Error())
+		} else {
+			log.Printf("Loaded %d results", len(c.Results))
+		}
+	}
 	go c.Crawl()
 
 	http.Handle("/stats", websocket.Handler(c.statsHandler))
 	http.Handle("/", http.FileServer(http.Dir("server")))
-	err := http.ListenAndServe(":7070", nil)
+	err = http.ListenAndServe(":7071", nil)
 	if err != nil {
 		panic("ListenAndServe: " + err.Error())
 	}

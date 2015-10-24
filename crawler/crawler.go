@@ -2,7 +2,7 @@ package crawler
 
 import (
 	"crypto/rand"
-	"fmt"
+	"log"
 	"math"
 	"net"
 	"sync"
@@ -49,7 +49,6 @@ func (s *Crawler) pingerTask() {
 	for {
 		// XXX: figure out the "right" interval for this
 		numPeers := len(s.AllPeers)
-		fmt.Printf("peers: %d\n", numPeers)
 		duration := time.Duration(uint64(math.Log(float64(numPeers)))) * 200
 		s.AllPeersMutex.Lock()
 		done := true
@@ -62,7 +61,7 @@ func (s *Crawler) pingerTask() {
 						RequestedNodeID: &neighbour.PublicKey,
 					}, &neighbour.DHTPeer)
 					if err != nil {
-						fmt.Println(err)
+						log.Println(err)
 					}
 					randomPK := [gotox.PublicKeySize]byte{}
 					rand.Read(randomPK[:])
@@ -70,7 +69,7 @@ func (s *Crawler) pingerTask() {
 						RequestedNodeID: &randomPK,
 					}, &neighbour.DHTPeer)
 					if err != nil {
-						fmt.Println(err)
+						log.Println(err)
 					}
 					neighbour.NumRequests++
 					s.AllPeers[neighbour.PublicKey] = neighbour
