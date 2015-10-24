@@ -57,7 +57,7 @@ func (c *Crawler) Crawl() {
 		numNodes := c.OneCrawl()
 		c.Mut.Lock()
 		c.Results = append(c.Results, Result{time.Now(), numNodes})
-		if len(c.Results) > 20 {
+		if len(c.Results) > 10000 {
 			c.Results = c.Results[1:]
 		}
 		c.Mut.Unlock()

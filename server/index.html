@@ -131,10 +131,10 @@ svg = d3.select("body").append("svg")
       .call(yAxis)
     .append("text")
       .attr("transform", "rotate(-90)")
-      .attr("y", 6)
+      .attr("y", -20)
       .attr("dy", ".71em")
       .style("text-anchor", "end")
-      .text("Price ($)");
+      .text("Nodes");
 
   svg.append("path")
       .datum(data)
