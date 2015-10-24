@@ -15,7 +15,7 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-const DataFile = "data.json"
+const DataFile = "data/data.json"
 const MaxDatapoints = 14000
 
 type Result struct {
