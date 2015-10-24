@@ -2,12 +2,15 @@
 <html>
 	<head>
 		<meta charset="UTF-8" />
-		<title></title>
+		<title>Tox-Crawler</title>
 		<script src="jquery-2.1.4.min.js"></script>
 <style>
 
 body {
-  font: 10px sans-serif;
+  font: 20px sans-serif;
+}
+svg {
+  font: 14px sans-serif;
 }
 
 .axis path,
@@ -28,37 +31,40 @@ body {
 }
 
 </style>
-		<script>
-//http://bl.ocks.org/mbostock/3883245
-            $(function() {
-                // build the path to the websocket
-                var loc = window.location, new_uri;
-                if (loc.protocol === "https:") {
-                    new_uri = "wss:";
-                } else {
-                    new_uri = "ws:";
-                }
-                new_uri += "//" + loc.host;
-                new_uri += loc.pathname + "stats";
-
-                // connect
-                var ws = new WebSocket(new_uri);
-                // handle new data
-                ws.onmessage = function(e) {
-                  render(JSON.parse(e.data));
-                };
-
-                // allow forced refresh
-                $('#sendBtn').click(function(){
-                      ws.send("refresh");
-                });
-            });
-        </script>
         </head>
         <body>
+            <h1>Tox Crawler</h1>
+            <p>This project crawls the Tox network every 5 minutes or so and graphs the number of nodes over time.</p>
+            <p>Source code: <a href="https://github.com/vikstrous/tox-crawler">https://github.com/vikstrous/tox-crawler</a></p>
+            <p>The graph is automatically refreshed when new data arrives using websockets. You can also use the refresh button to force a refresh. The server is configured to collect 14000 data points before it starts discarding data. This is about a megabyte per refresh. Keeping this page open will use an average of 4kbps when the server has the maximum amount of data it can hold.  <noscript>Please enable javascript to view the graph.</noscript></p>
         <input type="button" id="sendBtn" value="refresh"></input>
+        <hr>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
 <script>
+    $(function() {
+        // build the path to the websocket
+        var loc = window.location, new_uri;
+        if (loc.protocol === "https:") {
+            new_uri = "wss:";
+        } else {
+            new_uri = "ws:";
+        }
+        new_uri += "//" + loc.host;
+        new_uri += loc.pathname + "stats";
+
+        // connect
+        var ws = new WebSocket(new_uri);
+        // handle new data
+        ws.onmessage = function(e) {
+          render(JSON.parse(e.data));
+        };
+
+        // allow forced refresh
+        $('#sendBtn').click(function(){
+              ws.send("refresh");
+        });
+    });
+
 
 var margin = {top: 20, right: 20, bottom: 30, left: 50},
     width = 960 - margin.left - margin.right,
