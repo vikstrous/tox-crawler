@@ -29,6 +29,46 @@ svg {
   stroke-width: 1.5px;
 }
 
+.country:hover{
+  stroke: #fff;
+  stroke-width: 1.5px;
+}
+.text{
+  font-size:10px;
+  text-transform:capitalize;
+}
+#container {
+  margin:10px 10%;
+  border:2px solid #000;
+  border-radius: 5px;
+  height:100%;
+  overflow:hidden;
+  background: #F0F8FF;
+}
+.hidden { 
+  display: none; 
+}
+div.tooltip {
+  color: #222; 
+  background: #fff; 
+  padding: .5em; 
+  text-shadow: #f5f5f5 0 1px 0;
+  border-radius: 2px; 
+  box-shadow: 0px 0px 2px 0px #a6a6a6; 
+  opacity: 0.9; 
+  position: absolute;
+}
+.graticule {
+  fill: none;
+  stroke: #bbb;
+  stroke-width: .5px;
+  stroke-opacity: .5;
+}
+.equator {
+  stroke: #ccc;
+  stroke-width: 1px;
+}
+
 </style>
         </head>
         <body>
@@ -37,11 +77,241 @@ svg {
             <p>Source code: <a href="https://github.com/vikstrous/tox-crawler">https://github.com/vikstrous/tox-crawler</a></p>
             <p>The graph is automatically refreshed when new data arrives using websockets. You can also use the refresh button to force a refresh. The server is configured to collect 14000 data points before it starts discarding data. This is about a megabyte per refresh. The crawler is tracking only ipv4 nodes right now. <noscript>Please enable javascript to view the graph.</noscript></p>
         <input type="button" id="sendBtn" value="refresh"></input>
+
         <hr>
+
+
+      <div id="graph"></div>
+      <div id="container"></div>
 <script src="jquery-2.1.4.min.js"></script>
 <script src="d3.min.js"></script>
 <script src="topojson.v1.min.js"></script>
 <script>
+
+
+var redraw;
+(function(){
+d3.select(window).on("resize", throttle);
+
+var zoom = d3.behavior.zoom()
+    .scaleExtent([1, 9])
+    .on("zoom", move);
+
+
+var width = document.getElementById('container').offsetWidth;
+var height = width / 2;
+
+var topo,projection,path,svg2,g;
+
+var graticule = d3.geo.graticule();
+
+var tooltip = d3.select("#container").append("div").attr("class", "tooltip hidden");
+
+setup(width,height);
+
+function setup(width,height){
+  projection = d3.geo.mercator()
+    .translate([(width/2), (height/2)])
+    .scale( width / 2 / Math.PI);
+
+  path = d3.geo.path().projection(projection);
+
+  svg2 = d3.select("#container").append("svg")
+      .attr("width", width)
+      .attr("height", height)
+      .call(zoom)
+      //.on("click", click)
+      .append("g");
+
+  g = svg2.append("g")
+         .on("click", click);
+
+}
+
+d3.json("world-topo-min.json", function(error, world) {
+
+  var countries = topojson.feature(world, world.objects.countries).features;
+
+  topo = countries;
+  draw(topo);
+
+});
+
+function draw(topo) {
+
+  svg2.append("path")
+     .datum(graticule)
+     .attr("class", "graticule")
+     .attr("d", path);
+
+
+  g.append("path")
+   .datum({type: "LineString", coordinates: [[-180, 0], [-90, 0], [0, 0], [90, 0], [180, 0]]})
+   .attr("class", "equator")
+   .attr("d", path);
+
+
+  var country = g.selectAll(".country").data(topo);
+
+  country.enter().insert("path")
+      .attr("class", "country")
+      .attr("d", path)
+      .attr("id", function(d,i) { return d.id; })
+      .attr("title", function(d,i) { return name_correction(d.properties.name); })
+      .style("fill", function(d, i) {
+          if (country_counts) {
+            var count = country_counts[name_correction(d.properties.name)];
+                if (count !== undefined) {
+                    var percent = count / country_counts_max;
+                    // give the space a bit of an exponential curve
+                    percent = Math.log(Math.floor(percent*1023)+1)/Math.log(2)/10
+                    var value = Math.floor(percent * 255);
+                    var upper = Math.floor(value / 16);
+                    var lower = value % 16;
+                    if (d.properties.name == 'United States') {
+                        console.log('#0000' + hex[upper] + hex[lower])
+                    }
+              return '#0000' + hex[upper] + hex[lower];
+                    } else {
+              return '#000000';
+                    }
+          } else {
+              return d.properties.color;
+          }
+      });
+
+  //offsets for tooltips
+  var offsetL = document.getElementById('container').offsetLeft+20;
+  var offsetT = document.getElementById('container').offsetTop+10;
+
+  //tooltips
+  country
+    .on("mousemove", function(d,i) {
+
+      var mouse = d3.mouse(svg2.node()).map( function(d) { return parseInt(d); } );
+
+      tooltip.classed("hidden", false)
+             .attr("style", "left:"+(mouse[0]+offsetL)+"px;top:"+(mouse[1]+offsetT)+"px")
+             .html(
+                     d.properties.name + ": " + country_counts[name_correction(d.properties.name)]
+                  );
+
+      })
+      .on("mouseout",  function(d,i) {
+        tooltip.classed("hidden", true);
+      }); 
+
+
+  //EXAMPLE: adding some capitals from external CSV file
+  //d3.csv("data/country-capitals.csv", function(err, capitals) {
+
+  //  capitals.forEach(function(i){
+  //    addpoint(i.CapitalLongitude, i.CapitalLatitude, i.CapitalName );
+  //  });
+
+  //});
+
+}
+
+
+redraw = function() {
+  width = document.getElementById('container').offsetWidth;
+  height = width / 2;
+  d3.select('#container svg').remove();
+  setup(width,height);
+  draw(topo);
+}
+
+
+function move() {
+
+  var t = d3.event.translate;
+  var s = d3.event.scale; 
+  zscale = s;
+  var h = height/4;
+
+
+  t[0] = Math.min(
+    (width/height)  * (s - 1), 
+    Math.max( width * (1 - s), t[0] )
+  );
+
+  t[1] = Math.min(
+    h * (s - 1) + h * s, 
+    Math.max(height  * (1 - s) - h * s, t[1])
+  );
+
+  zoom.translate(t);
+  g.attr("transform", "translate(" + t + ")scale(" + s + ")");
+
+  //adjust the country hover stroke width based on zoom level
+  d3.selectAll(".country").style("stroke-width", 1.5 / s);
+
+}
+
+
+
+var throttleTimer;
+function throttle() {
+  window.clearTimeout(throttleTimer);
+    throttleTimer = window.setTimeout(function() {
+      redraw();
+    }, 200);
+}
+
+
+//geo translation on mouse click in map
+function click() {
+  var latlon = projection.invert(d3.mouse(this));
+  console.log(latlon);
+}
+
+
+//function to add points and text to the map (used in plotting capitals)
+function addpoint(lat,lon,text) {
+
+  var gpoint = g.append("g").attr("class", "gpoint");
+  var x = projection([lat,lon])[0];
+  var y = projection([lat,lon])[1];
+
+  gpoint.append("svg:circle")
+        .attr("cx", x)
+        .attr("cy", y)
+        .attr("class","point")
+        .attr("r", 1.5);
+
+  //conditional in case a point has no associated text
+  if(text.length>0){
+
+    gpoint.append("text")
+          .attr("x", x+2)
+          .attr("y", y+2)
+          .attr("class","text")
+          .text(text);
+  }
+
+}
+})();
+
+
+
+
+function name_correction(name) {
+    if (name_corrections[name] !== undefined) {
+        return name_corrections[name]
+    }
+    return name
+}
+var name_corrections = {
+    'Russian Federation': 'Russia'
+}
+
+
+
+var hex = '0123456789abcdef';
+var country_counts;
+var country_counts_max;
+var svg1;
     $(function() {
         // build the path to the websocket
         var loc = window.location, new_uri;
@@ -59,15 +329,23 @@ svg {
         ws.onmessage = function(e) {
           var data = JSON.parse(e.data);
           console.log(data);
+          country_counts = data.country_counts;
+          var max = 0;
+          for (var k in country_counts) {
+              var v = country_counts[k];
+              if (v > max) {
+                  max = v;
+              }
+          }
+          country_counts_max = max;
           render_graph(data.numbers_list);
+            redraw();
         };
 
         // allow forced refresh
         $('#sendBtn').click(function(){
               ws.send("refresh");
         });
-    });
-
 
 var margin = {top: 20, right: 20, bottom: 30, left: 50},
     width = 960 - margin.left - margin.right,
@@ -95,13 +373,11 @@ var line = d3.svg.line()
     .x(function(d) { return x(d.date); })
     .y(function(d) { return y(d.close); });
 
-var svg;
-
 function render_graph(data) {
-    if (svg) {
-    $(svg[0]).parent().remove()
-    }
-svg = d3.select("body").append("svg")
+if (svg1) {
+    $(svg1[0]).parent().remove()
+}
+svg1 = d3.select("#graph").append("svg")
     .attr("width", width + margin.left + margin.right)
     .attr("height", height + margin.top + margin.bottom)
     .append("g")
@@ -129,12 +405,12 @@ svg = d3.select("body").append("svg")
   x.domain(d3.extent(data, function(d) { return d.date; }));
   y.domain(d3.extent(data, function(d) { return d.close; }));
 
-  svg.append("g")
+  svg1.append("g")
       .attr("class", "x axis")
       .attr("transform", "translate(0," + height + ")")
       .call(xAxis);
 
-  svg.append("g")
+  svg1.append("g")
       .attr("class", "y axis")
       .call(yAxis)
     .append("text")
@@ -144,11 +420,13 @@ svg = d3.select("body").append("svg")
       .style("text-anchor", "end")
       .text("Nodes");
 
-  svg.append("path")
+  svg1.append("path")
       .datum(data)
       .attr("class", "line")
       .attr("d", line);
 }
+
+    });
 
 </script>
 
