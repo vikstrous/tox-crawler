@@ -4,6 +4,8 @@ This project is a crawler of the tox network. It's built in Go using the [gotox]
 
 See it live at http://tox.viktorstanchev.com.
 
-Example of a graph it can produce right now:
+Example of a graphs it can produce right now:
 
 ![screenshot](https://raw.githubusercontent.com/vikstrous/tox-crawler/master/screenshot.png)
+
+![screenshot](https://raw.githubusercontent.com/vikstrous/tox-crawler/master/screenshot2.png)
