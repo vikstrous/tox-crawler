@@ -7,7 +7,7 @@
 	"Deps": [
 		{
 			"ImportPath": "github.com/vikstrous/gotox",
-			"Rev": "4fdae1b883e01792338daabdd6d5a1c829f0a261"
+			"Rev": "54885321a1eb7dc319e013898a8245f92ee556cb"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/curve25519",

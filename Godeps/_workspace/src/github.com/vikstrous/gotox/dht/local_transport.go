@@ -8,9 +8,10 @@ import (
 type LocalTransport struct {
 	ChOut       *chan []byte
 	ChIn        *chan []byte
-	ChDone      chan struct{}
+	ChStop      chan struct{}
 	Identity    *Identity
 	ReceiveFunc ReceiveFunc
+	dataChan    chan TransportMessage
 }
 
 func NewLocalTransport(id *Identity) (*LocalTransport, error) {
@@ -18,8 +19,13 @@ func NewLocalTransport(id *Identity) (*LocalTransport, error) {
 	return &LocalTransport{
 		ChIn:     &chIn,
 		Identity: id,
-		ChDone:   make(chan struct{}),
+		ChStop:   make(chan struct{}),
+		dataChan: make(chan TransportMessage, 100),
 	}, nil
+}
+
+func (t *LocalTransport) DataChan() chan TransportMessage {
+	return t.dataChan
 }
 
 func (t *LocalTransport) Send(payload Payload, dest *DHTPeer) error {
@@ -43,7 +49,7 @@ func (t *LocalTransport) Send(payload Payload, dest *DHTPeer) error {
 	return nil
 }
 
-func (t *LocalTransport) Listen(ch chan struct{}) {
+func (t *LocalTransport) Listen() {
 listenLoop:
 	for {
 		select {
@@ -59,23 +65,17 @@ listenLoop:
 				log.Printf("error receiving: %v", err)
 				continue
 			}
-			terminate := t.ReceiveFunc(plainPacket, &net.UDPAddr{})
-			if terminate {
-				log.Printf("Clean termination.")
-				break listenLoop
-			}
-		case <-t.ChDone:
+			t.dataChan <- TransportMessage{*plainPacket, net.UDPAddr{}}
+		case <-t.ChStop:
 			break listenLoop
 		}
 	}
-	if ch != nil {
-		close(ch)
-	}
+	close(t.dataChan)
 	return
 }
 
 func (t *LocalTransport) Stop() {
-	close(t.ChDone)
+	close(t.ChStop)
 }
 
 func (t *LocalTransport) RegisterReceiver(receiver ReceiveFunc) {

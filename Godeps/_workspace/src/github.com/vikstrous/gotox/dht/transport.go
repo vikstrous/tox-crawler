@@ -6,25 +6,26 @@ import (
 	"time"
 )
 
-//  Transport/Listen[with identity] -> Application/Receiver.Receive() ...
-//  Transport/Sender[with identity].Send()
-//  Application whatever -> Transport/Sender[with identity].Send()
-
 // return true to terminate the listener
 type ReceiveFunc func(*PlainPacket, *net.UDPAddr) bool
 
+type TransportMessage struct {
+	Packet PlainPacket
+	Addr   net.UDPAddr
+}
+
 type Transport interface {
 	Send(payload Payload, dest *DHTPeer) error
-	Listen(chan struct{})
+	Listen()
 	Stop()
-	RegisterReceiver(receiver ReceiveFunc)
+	DataChan() chan TransportMessage
 }
 
 type UDPTransport struct {
-	Server      net.UDPConn
-	Identity    *Identity
-	ReceiveFunc ReceiveFunc
-	ChDone      chan struct{}
+	Server   net.UDPConn
+	Identity *Identity
+	dataChan chan TransportMessage
+	ChStop   chan struct{}
 }
 
 func NewUDPTransport(id *Identity) (*UDPTransport, error) {
@@ -36,8 +37,13 @@ func NewUDPTransport(id *Identity) (*UDPTransport, error) {
 	return &UDPTransport{
 		Server:   *listener,
 		Identity: id,
-		ChDone:   make(chan struct{}),
+		ChStop:   make(chan struct{}),
+		dataChan: make(chan TransportMessage, 100),
 	}, nil
+}
+
+func (t *UDPTransport) DataChan() chan TransportMessage {
+	return t.dataChan
 }
 
 func (t *UDPTransport) Send(payload Payload, dest *DHTPeer) error {
@@ -62,14 +68,14 @@ func (t *UDPTransport) Send(payload Payload, dest *DHTPeer) error {
 }
 
 func (t *UDPTransport) Stop() {
-	close(t.ChDone)
+	close(t.ChStop)
 }
 
-func (t *UDPTransport) Listen(ch chan struct{}) {
+func (t *UDPTransport) Listen() {
 listenLoop:
 	for {
 		select {
-		case <-t.ChDone:
+		case <-t.ChStop:
 			break listenLoop
 		default:
 			buffer := make([]byte, 2048)
@@ -98,23 +104,13 @@ listenLoop:
 					log.Printf("error receiving: %v", err)
 					continue
 				}
-				terminate := t.ReceiveFunc(plainPacket, addr)
-				if terminate {
-					log.Printf("Clean termination.")
-					break listenLoop
-				}
+				t.dataChan <- TransportMessage{*plainPacket, *addr}
 			} else {
 				log.Printf("Received empty message???")
 				continue
 			}
 		}
 	}
-	if ch != nil {
-		close(ch)
-	}
+	close(t.dataChan)
 	return
-}
-
-func (t *UDPTransport) RegisterReceiver(receiver ReceiveFunc) {
-	t.ReceiveFunc = receiver
 }

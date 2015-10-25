@@ -5,7 +5,7 @@ GO15VENDOREXPERIMENT=1
 all: utils
 
 test:
-	go test ./...
+	go test -v ./...
 
 #utils: bin/scan
 #bin/dhttest 

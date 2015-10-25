@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vikstrous/gotox/dht"
 	"github.com/vikstrous/tox-crawler/crawler"
 	"golang.org/x/net/websocket"
 )
@@ -41,21 +40,7 @@ func (c *Crawler) OneCrawl() int {
 		return 0
 	}
 
-	ch := make(chan struct{})
-	go crawl.Listen(ch)
-
-	for _, server := range dht.DhtServerList {
-		err := crawl.Send(&dht.GetNodes{
-			RequestedNodeID: &server.PublicKey,
-		}, &server)
-		if err != nil {
-			fmt.Printf("error %s\n", err)
-			return 0
-		}
-	}
-
-	<-ch
-	return len(crawl.AllPeers)
+	return len(crawl.Crawl())
 }
 
 func (c *Crawler) Crawl() {

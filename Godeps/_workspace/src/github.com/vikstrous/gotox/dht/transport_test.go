@@ -1,9 +1,6 @@
 package dht
 
-import (
-	"net"
-	"testing"
-)
+import "testing"
 
 func TestReceive(t *testing.T) {
 	id1, err := GenerateIdentity()
@@ -27,32 +24,31 @@ func TestReceive(t *testing.T) {
 		return
 	}
 
-	// used to wait for the test to finish
-	ch := make(chan struct{})
-
-	// register the receiver before we send
-	transport1.RegisterReceiver(func(pp *PlainPacket, addr *net.UDPAddr) bool {
-		switch payload := pp.Payload.(type) {
-		case *PingPong:
-			if payload.IsPing != true {
-				t.Fatalf("Was not ping: %b", payload.IsPing)
-			}
-			if payload.RequestID != 3 {
-				t.Fatalf("Wrong pingID: %d", payload.RequestID)
-			}
-		default:
-			t.Fatalf("Internal error. Failed to handle payload of parsed packet. %d\n", pp.Payload.Kind())
-		}
-		close(ch)
-		return true
-	})
-
 	// pipe the output of transport2 into the input of transport1
 	transport2.ChOut = transport1.ChIn
 	transport2.Send(&PingPong{IsPing: true, RequestID: 3}, &DHTPeer{PublicKey: id1.PublicKey})
 
 	// process the message
-	transport1.Listen(nil)
+	go transport1.Listen()
 
-	<-ch
+	// register the receiver before we send
+	message := <-transport1.DataChan()
+	switch payload := message.Packet.Payload.(type) {
+	case *PingPong:
+		if payload.IsPing != true {
+			t.Fatalf("Was not ping: %b", payload.IsPing)
+		}
+		if payload.RequestID != 3 {
+			t.Fatalf("Wrong pingID: %d", payload.RequestID)
+		}
+	default:
+		t.Fatalf("Internal error. Failed to handle payload of parsed packet. %d\n", message.Packet)
+		//t.Fatalf("Internal error. Failed to handle payload of parsed packet. %d\n", message.Packet.Payload.Kind())
+	}
+
+	transport1.Stop()
+	_, ok := <-transport1.DataChan()
+	if ok {
+		t.Fatalf("transport1 channel not closed correctly?")
+	}
 }
