@@ -6,6 +6,11 @@
 	],
 	"Deps": [
 		{
+			"ImportPath": "github.com/oschwald/maxminddb-golang",
+			"Comment": "v0.2.0-36-gb4a9635",
+			"Rev": "b4a963502ba01ab44940ee21d5539bd65c726924"
+		},
+		{
 			"ImportPath": "github.com/vikstrous/gotox",
 			"Rev": "54885321a1eb7dc319e013898a8245f92ee556cb"
 		},
