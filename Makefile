@@ -21,4 +21,7 @@ publish:
 	docker build -t vikstrous/tox-crawler $(MAKEFILE_DIR)
 	docker push vikstrous/tox-crawler
 
+deploy:
+	ssh root@tox.viktorstanchev.com docker pull vikstrous/tox-crawler '&&' docker rm -f tox-crawler '&&' docker run --name tox-crawler -d -p 80:7071 --restart always -v /root/data:/go/src/github.com/vikstrous/tox-crawler/data vikstrous/tox-crawler
+
 .PHONY: all build run push
