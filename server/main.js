@@ -159,7 +159,8 @@ var name_corrections = {
     'Korea': 'Republic of Korea',
     'Lithuania': 'Republic of Lithuania',
     'Moldova': 'Republic of Moldova',
-    'Slovakia': 'Slovak Republic'
+    'Slovakia': 'Slovak Republic',
+    'Viet Nam': 'Vietnam'
 }
 
 
