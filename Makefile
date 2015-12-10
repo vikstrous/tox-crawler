@@ -12,7 +12,7 @@ ASSETS_MOUNT=
 endif
 
 run: build
-	docker run $(ASSETS_MOUNT) -v $(MAKEFILE_DIR)/data:/go/src/github.com/vikstrous/tox-crawler/data -p 80:7071 tox-crawler
+	docker run --rm $(ASSETS_MOUNT) -v $(MAKEFILE_DIR)/data:/go/src/github.com/vikstrous/tox-crawler/data -p 80:7071 tox-crawler
 
 daemon: build
 	docker run --name tox-crawler -d -p 80:7071 --restart always -v $(MAKEFILE_DIR)/data:/go/src/github.com/vikstrous/tox-crawler/data tox-crawler

@@ -54,14 +54,6 @@ func (s *Crawler) Wait() {
 
 func (s *Crawler) Crawl() []dht.DHTPeer {
 	go s.Listen()
-	for _, server := range dht.DhtServerList {
-		err := s.Send(&dht.GetNodes{
-			RequestedNodeID: &server.PublicKey,
-		}, &server)
-		if err != nil {
-			fmt.Printf("error contacting bootstap node %v %s\n", server, err)
-		}
-	}
 	s.Wait()
 	peers := []dht.DHTPeer{}
 	for _, peerInfo := range s.AllPeers {
@@ -79,31 +71,37 @@ func (s *Crawler) pingerTask() {
 		done := true
 		for _, neighbour := range s.AllPeers {
 			// crawl only ipv4
-			if neighbour.Addr.IP.To4() != nil {
-				if neighbour.NumRequests < 10 {
-					done = false
-					err := s.Transport.Send(&dht.GetNodes{
-						RequestedNodeID: &neighbour.PublicKey,
-					}, &neighbour.DHTPeer)
-					if err != nil {
-						log.Println(err)
-					}
-					randomPK := [gotox.PublicKeySize]byte{}
-					rand.Read(randomPK[:])
-					err = s.Transport.Send(&dht.GetNodes{
-						RequestedNodeID: &randomPK,
-					}, &neighbour.DHTPeer)
-					if err != nil {
-						log.Println(err)
-					}
-					neighbour.NumRequests++
-					s.AllPeers[neighbour.PublicKey] = neighbour
+			if neighbour.Addr.IP.To4() != nil && neighbour.NumRequests < 10 {
+				done = false
+				err := s.Transport.Send(&dht.GetNodes{
+					RequestedNodeID: &neighbour.PublicKey,
+				}, &neighbour.DHTPeer)
+				if err != nil {
+					log.Println(err)
 				}
+				randomPK := [gotox.PublicKeySize]byte{}
+				rand.Read(randomPK[:])
+				err = s.Transport.Send(&dht.GetNodes{
+					RequestedNodeID: &randomPK,
+				}, &neighbour.DHTPeer)
+				if err != nil {
+					log.Println(err)
+				}
+				neighbour.NumRequests++
+				s.AllPeers[neighbour.PublicKey] = neighbour
 			}
 		}
 		s.AllPeersMutex.Unlock()
 		time.Sleep(duration * time.Millisecond)
 		if numPeers == 0 {
+			for _, server := range dht.DhtServerList {
+				err := s.Send(&dht.GetNodes{
+					RequestedNodeID: &server.PublicKey,
+				}, &server)
+				if err != nil {
+					fmt.Printf("error contacting bootstap node %v %s\n", server, err)
+				}
+			}
 			time.Sleep(time.Second)
 		} else {
 			if done {
